@@ -1,3 +1,8 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Girasoles al Nacer</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap">
 <style>
@@ -19,12 +24,13 @@
 
   *{box-sizing:border-box;}
 
-  body{
+  html, body{
     margin:0;
     background:radial-gradient(120% 90% at 50% 12%, var(--bg-glow) 0%, var(--bg-deep) 46%, var(--bg-deeper) 100%);
     color:var(--ink);
     font-family:"Sora","Segoe UI",sans-serif;
     min-height:100vh;
+    min-height:100dvh;
     display:flex;
     flex-direction:column;
     align-items:center;
@@ -35,7 +41,8 @@
     position:relative;
     width:100%;
     max-width:640px;
-    aspect-ratio:2/3;
+    min-height:100vh;
+    min-height:100dvh;
     margin:0 auto;
     display:flex;
     flex-direction:column;
@@ -181,6 +188,8 @@
     .flower-sway{ animation:none; }
   }
 </style>
+</head>
+<body>
 
 <div class="stage">
   <canvas id="sky"></canvas>
@@ -577,3 +586,5 @@
   });
 })();
 </script>
+</body>
+</html>
