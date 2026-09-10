@@ -1,0 +1,579 @@
+<title>Girasoles al Nacer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg-deep:#0b0e24;
+    --bg-deeper:#05061a;
+    --bg-glow:#241a4a;
+    --petal-gold:#ffc93c;
+    --petal-amber:#ff8f1c;
+    --center-dark:#2b1608;
+    --center-ring:#6e3d14;
+    --leaf-deep:#173d29;
+    --leaf-mid:#2f7d4f;
+    --leaf-light:#4fa06a;
+    --ink:#f4efe3;
+    --ink-dim:#c9c3e0;
+    --stem:#2c6b45;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:radial-gradient(120% 90% at 50% 12%, var(--bg-glow) 0%, var(--bg-deep) 46%, var(--bg-deeper) 100%);
+    color:var(--ink);
+    font-family:"Sora","Segoe UI",sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    overflow-x:hidden;
+  }
+
+  .stage{
+    position:relative;
+    width:100%;
+    max-width:640px;
+    aspect-ratio:2/3;
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+  }
+
+  canvas#sky{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    display:block;
+  }
+
+  .garden{
+    position:relative;
+    z-index:2;
+    width:100%;
+    flex:1;
+    display:block;
+    padding-top:clamp(20px,5vh,44px);
+  }
+
+  .garden svg{
+    width:100%;
+    height:100%;
+    display:block;
+    overflow:visible;
+  }
+
+  /* ---- stems (attribute transform only on their own <g>, safe) ---- */
+  .stem-path{
+    fill:none;
+    stroke:var(--stem);
+    stroke-width:5;
+    stroke-linecap:round;
+    stroke-dasharray:100;
+    stroke-dashoffset:100;
+    animation:draw 0.85s cubic-bezier(.34,.9,.4,1) forwards;
+    animation-delay:var(--d, 0s);
+  }
+  @keyframes draw{
+    to{stroke-dashoffset:0;}
+  }
+
+  /* ---- leaves along stem: class sits on an INNER g with no attribute
+         transform of its own, so it never collides with the outer
+         positioning g's transform="translate(...) rotate(...)" ---- */
+  .stem-leaf{
+    transform-origin:0px 0px;
+    transform:scale(0);
+    opacity:0;
+    animation:leafPop .55s cubic-bezier(.3,1.6,.5,1) forwards;
+    animation-delay:calc(var(--d, 0s) + 0.5s);
+  }
+  @keyframes leafPop{
+    to{transform:scale(1); opacity:1;}
+  }
+
+  /* ---- flower head: two inner layers, each with its OWN class, so the
+         "bloom" entrance and the "sway" idle loop never fight over the
+         same `animation` shorthand on one element. Both live inside a
+         plain positioning <g> (attribute transform only). ---- */
+  .flower-bloom{
+    transform-origin:100px 100px;
+    transform:scale(0) rotate(-14deg);
+    opacity:0;
+    filter:drop-shadow(0 0 14px rgba(255,180,60,.55));
+    animation:bloom .7s cubic-bezier(.28,1.4,.4,1) forwards;
+    animation-delay:calc(var(--d, 0s) + 0.62s);
+  }
+  @keyframes bloom{
+    60%{transform:scale(1.08) rotate(3deg); opacity:1;}
+    to{transform:scale(1) rotate(0deg); opacity:1;}
+  }
+
+  .flower-sway{
+    transform-origin:100px 100px;
+    animation:sway var(--sdur,5s) ease-in-out infinite alternate;
+    animation-delay:calc(var(--d, 0s) + 1.35s + var(--sdelay,0s));
+  }
+  @keyframes sway{
+    from{transform:rotate(-1.6deg);}
+    to{transform:rotate(1.6deg);}
+  }
+
+  .petal{
+    transform-origin:100px 100px;
+    transform:scale(0);
+    animation:petalUnfurl .5s ease-out forwards;
+    animation-delay:calc(var(--d, 0s) + 0.62s + var(--pd,0s));
+  }
+  @keyframes petalUnfurl{
+    to{transform:scale(1);}
+  }
+
+  .bush{
+    transform-origin:200px 600px;
+    transform:scale(0);
+    opacity:0;
+    animation:bushPop 1s cubic-bezier(.3,1.4,.4,1) forwards;
+    animation-delay:0.05s;
+  }
+  @keyframes bushPop{
+    to{transform:scale(1); opacity:1;}
+  }
+
+  .controls{
+    position:relative;
+    z-index:3;
+    display:flex;
+    justify-content:center;
+    padding:8px 0 clamp(20px,4vh,32px);
+  }
+
+  button#replay{
+    font-family:"Sora",sans-serif;
+    font-size:13px;
+    font-weight:500;
+    letter-spacing:.03em;
+    color:var(--ink);
+    background:rgba(255,201,60,.1);
+    border:1px solid rgba(255,201,60,.35);
+    padding:10px 22px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .2s ease, border-color .2s ease, transform .15s ease;
+  }
+  button#replay:hover{
+    background:rgba(255,201,60,.2);
+    border-color:rgba(255,201,60,.55);
+  }
+  button#replay:active{ transform:scale(.96); }
+  button#replay:focus-visible{
+    outline:2px solid var(--petal-gold);
+    outline-offset:2px;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .stem-path, .stem-leaf, .flower-bloom, .petal, .bush{
+      animation-duration:.01s !important;
+      animation-delay:0s !important;
+    }
+    .flower-sway{ animation:none; }
+  }
+</style>
+
+<div class="stage">
+  <canvas id="sky"></canvas>
+
+  <div class="garden">
+    <svg viewBox="0 0 400 620" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="petalGrad" cx="50%" cy="18%" r="90%">
+          <stop offset="0%" stop-color="#fff3c4"/>
+          <stop offset="55%" stop-color="var(--petal-gold)"/>
+          <stop offset="100%" stop-color="var(--petal-amber)"/>
+        </radialGradient>
+
+        <radialGradient id="centerGrad" cx="42%" cy="38%" r="65%">
+          <stop offset="0%" stop-color="var(--center-ring)"/>
+          <stop offset="70%" stop-color="var(--center-dark)"/>
+          <stop offset="100%" stop-color="#160a03"/>
+        </radialGradient>
+
+        <pattern id="seeds" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(12)">
+          <circle cx="4.5" cy="4.5" r="1.3" fill="#4a2c11" opacity=".8"/>
+        </pattern>
+
+        <linearGradient id="leafGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="var(--leaf-light)"/>
+          <stop offset="100%" stop-color="var(--leaf-deep)"/>
+        </linearGradient>
+
+        <radialGradient id="bushGrad" cx="50%" cy="20%" r="85%">
+          <stop offset="0%" stop-color="var(--leaf-mid)"/>
+          <stop offset="100%" stop-color="var(--leaf-deep)"/>
+        </radialGradient>
+      </defs>
+
+      <!-- ============ LEAF BUSH (back layer) ============ -->
+      <g class="bush">
+        <ellipse cx="130" cy="600" rx="80" ry="46" fill="url(#bushGrad)"/>
+        <ellipse cx="270" cy="600" rx="80" ry="46" fill="url(#bushGrad)"/>
+        <ellipse cx="200" cy="580" rx="110" ry="55" fill="url(#bushGrad)"/>
+        <ellipse cx="160" cy="560" rx="55" ry="34" fill="var(--leaf-mid)"/>
+        <ellipse cx="245" cy="565" rx="58" ry="32" fill="var(--leaf-mid)"/>
+        <ellipse cx="200" cy="545" rx="48" ry="28" fill="var(--leaf-light)" opacity=".55"/>
+      </g>
+
+      <!-- ============ STEMS + FLOWERS ============ -->
+      <!-- Flower 1: back center, small -->
+      <g style="--d:0.05s">
+        <path class="stem-path" pathLength="100" d="M200,560 C198,470 205,400 202,330"/>
+        <g transform="translate(190,470) rotate(-25)"><g class="stem-leaf"><path d="M0,0 C-26,-6 -40,10 -34,26 C-14,22 -2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(210,420) rotate(20)"><g class="stem-leaf"><path d="M0,0 C26,-6 40,10 34,26 C14,22 2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(202,300) scale(.62) translate(-100,-100)">
+          <g class="flower-bloom">
+            <g class="flower-sway" style="--sdur:6.5s;--sdelay:1.2s;">
+              <g class="petal-ring">
+                <g transform="rotate(0 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.00s"/></g>
+                <g transform="rotate(30 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.03s"/></g>
+                <g transform="rotate(60 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.06s"/></g>
+                <g transform="rotate(90 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.09s"/></g>
+                <g transform="rotate(120 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.12s"/></g>
+                <g transform="rotate(150 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.15s"/></g>
+                <g transform="rotate(180 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.18s"/></g>
+                <g transform="rotate(210 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.21s"/></g>
+                <g transform="rotate(240 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.24s"/></g>
+                <g transform="rotate(270 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.27s"/></g>
+                <g transform="rotate(300 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.30s"/></g>
+                <g transform="rotate(330 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.33s"/></g>
+              </g>
+              <circle cx="100" cy="100" r="35" fill="url(#centerGrad)"/>
+              <circle cx="100" cy="100" r="35" fill="url(#seeds)" opacity=".65"/>
+              <circle cx="100" cy="100" r="36" fill="none" stroke="#3a1f0a" stroke-width="2" opacity=".6"/>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- Flower 2: upper left -->
+      <g style="--d:0.55s">
+        <path class="stem-path" pathLength="100" d="M188,560 C150,480 130,420 128,350"/>
+        <g transform="translate(118,460) rotate(-30)"><g class="stem-leaf"><path d="M0,0 C-26,-6 -40,10 -34,26 C-14,22 -2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(128,320) scale(.78) translate(-100,-100)">
+          <g class="flower-bloom">
+            <g class="flower-sway" style="--sdur:5.5s;--sdelay:.4s;">
+              <g class="petal-ring">
+                <g transform="rotate(15 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.00s"/></g>
+                <g transform="rotate(45 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.03s"/></g>
+                <g transform="rotate(75 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.06s"/></g>
+                <g transform="rotate(105 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.09s"/></g>
+                <g transform="rotate(135 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.12s"/></g>
+                <g transform="rotate(165 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.15s"/></g>
+                <g transform="rotate(195 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.18s"/></g>
+                <g transform="rotate(225 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.21s"/></g>
+                <g transform="rotate(255 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.24s"/></g>
+                <g transform="rotate(285 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.27s"/></g>
+                <g transform="rotate(315 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.30s"/></g>
+                <g transform="rotate(345 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.33s"/></g>
+              </g>
+              <circle cx="100" cy="100" r="35" fill="url(#centerGrad)"/>
+              <circle cx="100" cy="100" r="35" fill="url(#seeds)" opacity=".65"/>
+              <circle cx="100" cy="100" r="36" fill="none" stroke="#3a1f0a" stroke-width="2" opacity=".6"/>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- Flower 3: upper right -->
+      <g style="--d:1.05s">
+        <path class="stem-path" pathLength="100" d="M212,560 C252,480 272,420 274,350"/>
+        <g transform="translate(284,460) rotate(30)"><g class="stem-leaf"><path d="M0,0 C26,-6 40,10 34,26 C14,22 2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(274,320) scale(.78) translate(-100,-100)">
+          <g class="flower-bloom">
+            <g class="flower-sway" style="--sdur:5.8s;--sdelay:.9s;">
+              <g class="petal-ring">
+                <g transform="rotate(0 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.00s"/></g>
+                <g transform="rotate(30 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.03s"/></g>
+                <g transform="rotate(60 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.06s"/></g>
+                <g transform="rotate(90 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.09s"/></g>
+                <g transform="rotate(120 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.12s"/></g>
+                <g transform="rotate(150 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.15s"/></g>
+                <g transform="rotate(180 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.18s"/></g>
+                <g transform="rotate(210 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.21s"/></g>
+                <g transform="rotate(240 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.24s"/></g>
+                <g transform="rotate(270 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.27s"/></g>
+                <g transform="rotate(300 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.30s"/></g>
+                <g transform="rotate(330 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.33s"/></g>
+              </g>
+              <circle cx="100" cy="100" r="35" fill="url(#centerGrad)"/>
+              <circle cx="100" cy="100" r="35" fill="url(#seeds)" opacity=".65"/>
+              <circle cx="100" cy="100" r="36" fill="none" stroke="#3a1f0a" stroke-width="2" opacity=".6"/>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- Flower 4: mid left -->
+      <g style="--d:1.55s">
+        <path class="stem-path" pathLength="100" d="M175,565 C110,510 80,460 72,410"/>
+        <g transform="translate(78,490) rotate(-35)"><g class="stem-leaf"><path d="M0,0 C-24,-4 -36,12 -30,26 C-12,20 -2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(70,378) scale(.68) translate(-100,-100)">
+          <g class="flower-bloom">
+            <g class="flower-sway" style="--sdur:6.1s;--sdelay:0s;">
+              <g class="petal-ring">
+                <g transform="rotate(10 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.00s"/></g>
+                <g transform="rotate(40 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.03s"/></g>
+                <g transform="rotate(70 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.06s"/></g>
+                <g transform="rotate(100 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.09s"/></g>
+                <g transform="rotate(130 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.12s"/></g>
+                <g transform="rotate(160 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.15s"/></g>
+                <g transform="rotate(190 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.18s"/></g>
+                <g transform="rotate(220 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.21s"/></g>
+                <g transform="rotate(250 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.24s"/></g>
+                <g transform="rotate(280 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.27s"/></g>
+                <g transform="rotate(310 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.30s"/></g>
+                <g transform="rotate(340 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.33s"/></g>
+              </g>
+              <circle cx="100" cy="100" r="35" fill="url(#centerGrad)"/>
+              <circle cx="100" cy="100" r="35" fill="url(#seeds)" opacity=".65"/>
+              <circle cx="100" cy="100" r="36" fill="none" stroke="#3a1f0a" stroke-width="2" opacity=".6"/>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- Flower 5: mid right -->
+      <g style="--d:2.05s">
+        <path class="stem-path" pathLength="100" d="M225,565 C290,510 320,460 328,410"/>
+        <g transform="translate(322,490) rotate(35)"><g class="stem-leaf"><path d="M0,0 C24,-4 36,12 30,26 C12,20 2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(330,378) scale(.68) translate(-100,-100)">
+          <g class="flower-bloom">
+            <g class="flower-sway" style="--sdur:5.3s;--sdelay:.6s;">
+              <g class="petal-ring">
+                <g transform="rotate(0 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.00s"/></g>
+                <g transform="rotate(30 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.03s"/></g>
+                <g transform="rotate(60 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.06s"/></g>
+                <g transform="rotate(90 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.09s"/></g>
+                <g transform="rotate(120 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.12s"/></g>
+                <g transform="rotate(150 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.15s"/></g>
+                <g transform="rotate(180 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.18s"/></g>
+                <g transform="rotate(210 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.21s"/></g>
+                <g transform="rotate(240 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.24s"/></g>
+                <g transform="rotate(270 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.27s"/></g>
+                <g transform="rotate(300 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.30s"/></g>
+                <g transform="rotate(330 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.33s"/></g>
+              </g>
+              <circle cx="100" cy="100" r="35" fill="url(#centerGrad)"/>
+              <circle cx="100" cy="100" r="35" fill="url(#seeds)" opacity=".65"/>
+              <circle cx="100" cy="100" r="36" fill="none" stroke="#3a1f0a" stroke-width="2" opacity=".6"/>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- Flower 6: front left, largest -->
+      <g style="--d:2.55s">
+        <path class="stem-path" pathLength="100" d="M182,568 C150,520 132,470 130,430"/>
+        <g transform="translate(126,520) rotate(-28)"><g class="stem-leaf"><path d="M0,0 C-28,-6 -42,12 -36,28 C-14,22 -2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(128,400) scale(.94) translate(-100,-100)">
+          <g class="flower-bloom">
+            <g class="flower-sway" style="--sdur:5.9s;--sdelay:.2s;">
+              <g class="petal-ring">
+                <g transform="rotate(20 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.00s"/></g>
+                <g transform="rotate(50 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.03s"/></g>
+                <g transform="rotate(80 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.06s"/></g>
+                <g transform="rotate(110 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.09s"/></g>
+                <g transform="rotate(140 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.12s"/></g>
+                <g transform="rotate(170 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.15s"/></g>
+                <g transform="rotate(200 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.18s"/></g>
+                <g transform="rotate(230 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.21s"/></g>
+                <g transform="rotate(260 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.24s"/></g>
+                <g transform="rotate(290 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.27s"/></g>
+                <g transform="rotate(320 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.30s"/></g>
+                <g transform="rotate(350 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.33s"/></g>
+              </g>
+              <circle cx="100" cy="100" r="36" fill="url(#centerGrad)"/>
+              <circle cx="100" cy="100" r="36" fill="url(#seeds)" opacity=".65"/>
+              <circle cx="100" cy="100" r="37" fill="none" stroke="#3a1f0a" stroke-width="2" opacity=".6"/>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- Flower 7: front right, largest -->
+      <g style="--d:3.05s">
+        <path class="stem-path" pathLength="100" d="M218,568 C250,520 268,470 270,430"/>
+        <g transform="translate(274,520) rotate(28)"><g class="stem-leaf"><path d="M0,0 C28,-6 42,12 36,28 C14,22 2,10 0,0 Z" fill="url(#leafGrad)"/></g></g>
+        <g transform="translate(272,400) scale(.94) translate(-100,-100)">
+          <g class="flower-bloom">
+            <g class="flower-sway" style="--sdur:6.3s;--sdelay:.8s;">
+              <g class="petal-ring">
+                <g transform="rotate(0 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.00s"/></g>
+                <g transform="rotate(30 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.03s"/></g>
+                <g transform="rotate(60 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.06s"/></g>
+                <g transform="rotate(90 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.09s"/></g>
+                <g transform="rotate(120 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.12s"/></g>
+                <g transform="rotate(150 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.15s"/></g>
+                <g transform="rotate(180 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.18s"/></g>
+                <g transform="rotate(210 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.21s"/></g>
+                <g transform="rotate(240 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.24s"/></g>
+                <g transform="rotate(270 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.27s"/></g>
+                <g transform="rotate(300 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.30s"/></g>
+                <g transform="rotate(330 100 100)"><ellipse class="petal" cx="100" cy="52" rx="15" ry="47" fill="url(#petalGrad)" style="--pd:0.33s"/></g>
+              </g>
+              <circle cx="100" cy="100" r="36" fill="url(#centerGrad)"/>
+              <circle cx="100" cy="100" r="36" fill="url(#seeds)" opacity=".65"/>
+              <circle cx="100" cy="100" r="37" fill="none" stroke="#3a1f0a" stroke-width="2" opacity=".6"/>
+            </g>
+          </g>
+        </g>
+      </g>
+
+      <!-- ============ LEAF BUSH (front layer, overlaps stem bases) ============ -->
+      <g class="bush" style="animation-delay:3.5s;">
+        <ellipse cx="150" cy="608" rx="70" ry="40" fill="var(--leaf-mid)" opacity=".95"/>
+        <ellipse cx="252" cy="608" rx="70" ry="40" fill="var(--leaf-mid)" opacity=".95"/>
+        <ellipse cx="200" cy="596" rx="95" ry="42" fill="var(--leaf-light)" opacity=".5"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="controls">
+    <button id="replay" type="button">🌻 Volver a florecer</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var canvas = document.getElementById('sky');
+  var ctx = canvas.getContext('2d');
+  var stage = document.querySelector('.stage');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var W, H;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function resize(){
+    var rect = stage.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // twinkling stars
+  var stars = [];
+  var starCount = Math.round((W*H)/9000) + 24;
+  for (var i=0;i<starCount;i++){
+    stars.push({
+      x: Math.random()*W,
+      y: Math.random()*H*0.55,
+      r: Math.random()*1.6 + 0.5,
+      phase: Math.random()*Math.PI*2,
+      speed: 0.6 + Math.random()*1.1,
+      four: Math.random() < 0.16
+    });
+  }
+
+  // floating fireflies / light bokeh
+  var flies = [];
+  var flyCount = 14;
+  for (var j=0;j<flyCount;j++){
+    flies.push(makeFly());
+  }
+  function makeFly(){
+    return {
+      x: Math.random()*W,
+      y: H*0.45 + Math.random()*H*0.55,
+      r: Math.random()*2.2 + 1.4,
+      vy: -(0.08 + Math.random()*0.14),
+      vx: (Math.random()-0.5)*0.06,
+      life: 0,
+      maxLife: 220 + Math.random()*260,
+      phase: Math.random()*Math.PI*2
+    };
+  }
+
+  function drawStar4(x,y,r,alpha){
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.moveTo(0,-r*3); ctx.lineTo(r*0.5,-r*0.5);
+    ctx.lineTo(r*3,0); ctx.lineTo(r*0.5,r*0.5);
+    ctx.lineTo(0,r*3); ctx.lineTo(-r*0.5,r*0.5);
+    ctx.lineTo(-r*3,0); ctx.lineTo(-r*0.5,-r*0.5);
+    ctx.closePath();
+    ctx.fillStyle = '#ffe9a8';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  var t = 0;
+  function frame(){
+    t += 1;
+    ctx.clearRect(0,0,W,H);
+
+    // stars
+    for (var i=0;i<stars.length;i++){
+      var s = stars[i];
+      var tw = 0.35 + 0.65 * (0.5 + 0.5*Math.sin(t*0.02*s.speed + s.phase));
+      if (s.four){
+        drawStar4(s.x, s.y, s.r*1.3, tw*0.9);
+      } else {
+        ctx.beginPath();
+        ctx.globalAlpha = tw;
+        ctx.fillStyle = '#fff6df';
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // fireflies
+    for (var k=0;k<flies.length;k++){
+      var f = flies[k];
+      f.life++;
+      f.x += f.vx + Math.sin(t*0.03 + f.phase)*0.08;
+      f.y += f.vy;
+      var lifeRatio = f.life / f.maxLife;
+      var fade = lifeRatio < 0.15 ? lifeRatio/0.15 : (lifeRatio > 0.8 ? (1-lifeRatio)/0.2 : 1);
+      var glow = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.r*5);
+      glow.addColorStop(0, 'rgba(255,233,168,'+(0.9*fade)+')');
+      glow.addColorStop(1, 'rgba(255,233,168,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(f.x,f.y,f.r*5,0,Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(255,246,223,'+fade+')';
+      ctx.arc(f.x,f.y,f.r*0.5,0,Math.PI*2);
+      ctx.fill();
+      if (f.life > f.maxLife || f.y < H*0.05){
+        flies[k] = makeFly();
+      }
+    }
+
+    if (!reduce) requestAnimationFrame(frame);
+  }
+  frame();
+  if (reduce){
+    setInterval(frame, 2000);
+  }
+
+  // replay control: retrigger CSS animations
+  var replayBtn = document.getElementById('replay');
+  var animatedEls = document.querySelectorAll('.stem-path, .stem-leaf, .flower-bloom, .flower-sway, .petal, .bush');
+  replayBtn.addEventListener('click', function(){
+    animatedEls.forEach(function(el){
+      el.style.animation = 'none';
+    });
+    void document.body.offsetHeight;
+    animatedEls.forEach(function(el){
+      el.style.animation = '';
+    });
+  });
+})();
+</script>
